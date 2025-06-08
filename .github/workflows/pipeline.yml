@@ -1,0 +1,123 @@
+name: Dynamic Lambda Deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  PROJECT_NAME: my-lambda
+  ENVIRONMENT: staging
+  S3_BUCKET_NAME: my-shared-lambdas-bucket
+  TERRAFORM_PATH: terraform
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # -------------------------------
+      # 🧾 CHECKOUT
+      # -------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------------------------------
+      # ⚙️ SETUP NODE & VARS
+      # -------------------------------        
+      - name: Setup Node.js and Env Vars
+        uses: iamelisandromello/terraform-pipeline-template/setup-node@main
+        with:
+          node_version: '20'
+
+      # -------------------------------
+      # 🔧 BUILD & PACKAGE LAMBDA
+      # -------------------------------          
+      - name: Install & Build
+        uses: iamelisandromello/terraform-pipeline-template/build-package@main
+        with:
+          project_name: ${{ env.PROJECT_NAME }}
+
+      # -------------------------------
+      # 🔄 UPLOAD LAMBDA TO S3
+      # -------------------------------        
+      - name: Upload Lambda to S3
+        uses: iamelisandromello/terraform-pipeline-template/upload-to-s3@main
+        with:
+          global_env_vars_json: ${{ secrets.GLOBAL_ENV_VARS_JSON }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          project_name: ${{ env.PROJECT_NAME }}
+
+      # -------------------------------
+      # ⚙️ TERRAFORM SETUP & TFVARS
+      # -------------------------------          
+      - name: Setup Terraform
+        uses: iamelisandromello/terraform-pipeline-template/setup-terraform@main
+        with:
+          terraform_version: '1.5.6'
+          environment: ${{ env.ENVIRONMENT }}
+          project_name: ${{ env.PROJECT_NAME }}
+          s3_bucket_name: ${{ env.S3_BUCKET_NAME }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # -------------------------------
+      # 🔄 GENERATE TVARS
+      # -------------------------------          
+      - name: Generate tfvars
+        uses: iamelisandromello/terraform-pipeline-template/generate-tfvars@main
+        with:
+          ENVIRONMENTS: ${{ secrets.ENVIRONMENTS }}
+          GLOBAL_ENV_VARS_JSON: ${{ secrets.GLOBAL_ENV_VARS_JSON }}
+          s3_bucket_name: ${{ env.S3_BUCKET_NAME }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+
+      - name: Debug verificar conteúdo do terraform.auto.tfvars.json
+        run: |
+          echo "📂 Listando arquivos no diretório terraform/"
+          ls -lah terraform/
+
+          echo "📄 Conteúdo de terraform.tfvars:"
+          cat terraform/terraform.auto.tfvars.json || echo "❌ Arquivo terraform.auto.tfvars.json não encontrado"
+
+      # -------------------------------
+      # 🔄 IMPORT, VALIDATE & APPLY TERRAFORM
+      # -------------------------------    
+      - name: Importar recursos existentes
+        uses: iamelisandromello/terraform-pipeline-template/import-resources@main
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ env.AWS_REGION }}
+          project_name: ${{ env.PROJECT_NAME }}
+          environment: ${{ env.ENVIRONMENT }}
+          terraform_path: ${{ env.TERRAFORM_PATH }}
+
+      - name: Validar Terraform
+        uses: iamelisandromello/terraform-pipeline-template/validate-terraform@main
+        with:
+          terraform_path: ${{ env.TERRAFORM_PATH }}
+
+      - name: Terraform Plan and Apply
+        uses: iamelisandromello/terraform-pipeline-template/plan-apply-terraform@main
+        with:
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          S3_BUCKET_NAME: ${{ env.S3_BUCKET_NAME }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GLOBAL_ENV_VARS_JSON: ${{ secrets.GLOBAL_ENV_VARS_JSON }}
+          ENVIRONMENTS_JSON: ${{ secrets.ENVIRONMENTS }}
+          terraform_path: ${{ env.TERRAFORM_PATH }}
