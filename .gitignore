@@ -1,0 +1,13 @@
+.env
+node_modules
+package-lock.json
+dist
+coverage
+yarn.lock
+.vscode/launch.json
+**/*.DS_Store
+*.zip
+lambda-package/
+.terraform/
+terraform.tfstate*
+
