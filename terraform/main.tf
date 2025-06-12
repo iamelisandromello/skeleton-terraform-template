@@ -44,9 +44,11 @@ module "iam" {
   lambda_role_name    = local.lambda_role_name
   logging_policy_name = local.logging_policy_name
   publish_policy_name = local.publish_policy_name
-  # MODIFICADO: Passa o ARN da SQS apenas se ela for criada, senão passa uma string vazia
-  # Isso permite que o módulo IAM decida se anexa políticas SQS ou não
-  sqs_queue_arn       = var.create_sqs_queue ? module.sqs[0].queue_arn : "" # Adicionado '[0]' devido ao 'count'
+  # MODIFICADO: Passa o ARN da SQS. Se SQS não for criada, passa a string placeholder.
+  # O módulo IAM agora usará essa string para decidir se cria a política ou não.
+  sqs_queue_arn       = var.create_sqs_queue ? module.sqs[0].queue_arn : "SQS_NOT_CREATED_PLACEHOLDER" # String explícita para evitar confusão.
+  # NOVO: Passa a variável de controle da SQS para o módulo IAM
+  create_sqs_queue    = var.create_sqs_queue
 }
 
 module "cloudwatch" {
