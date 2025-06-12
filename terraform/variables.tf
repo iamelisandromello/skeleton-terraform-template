@@ -27,7 +27,7 @@ variable "environment" {
     error_message = "environment não pode estar vazio."
   }
 }
-  
+ 
 # ================================
 # Variáveis de ambiente da Lambda
 # ================================
@@ -54,4 +54,11 @@ variable "s3_bucket_name" {
     condition     = length(var.s3_bucket_name) > 0
     error_message = "s3_bucket_name não pode estar vazio."
   }
+}
+
+# NOVO: Variável para controlar a criação da fila SQS
+variable "create_sqs_queue" {
+  description = "Define se a fila SQS deve ser criada (true/false)."
+  type        = bool
+  default     = true # Por padrão, a fila será criada
 }
