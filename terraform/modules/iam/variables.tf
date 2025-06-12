@@ -21,3 +21,10 @@ variable "sqs_queue_arn" {
   description = "ARN da fila SQS"
   type        = string
 }
+
+# NOVO: Variável para controlar a criação condicional da política SQS
+variable "create_sqs_queue" {
+  description = "Define se a fila SQS (e, portanto, sua política de publicação) deve ser criada."
+  type        = bool
+  default     = true # O padrão é true para manter o comportamento existente
+}
