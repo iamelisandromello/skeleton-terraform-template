@@ -25,20 +25,28 @@ module "sqs" {
   source     = "./modules/sqs"
   count      = var.create_sqs_queue && !var.use_existing_sqs_trigger ? 1 : 0 # O módulo será criado se var.create_sqs_queue for true e não estivermos usando uma fila existente
   queue_name = local.queue_name
+
+  # NOVO: Validação para garantir que não tentamos criar SQS e usar uma existente ao mesmo tempo
+  # ou criar SQS sem um nome de fila válido.
+  lifecycle {
+    precondition {
+      condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
+      error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
+    }
+  }
 }
 
 module "lambda" {
   source              = "./modules/lambda"
   lambda_name         = local.lambda_name
-  s3_bucket           = data.aws_s3_bucket.lambda_code_bucket.bucket
-  s3_key              = local.s3_object_key
+  role_arn            = module.iam.role_arn
   handler             = local.lambda_handler
   runtime             = local.lambda_runtime
-  role_arn            = module.iam.role_arn
+  s3_bucket           = data.aws_s3_bucket.lambda_code_bucket.bucket
+  s3_key              = local.s3_object_key
   environment_variables = local.merged_env_vars
-  # NOVO: Passa o ARN da SQS existente e a flag para o módulo Lambda (para a trigger)
-  use_existing_sqs_trigger = var.use_existing_sqs_trigger
-  existing_sqs_queue_arn   = var.existing_sqs_queue_arn
+  # Nenhuma nova variável para a trigger aqui, pois a aws_lambda_event_source_mapping
+  # é criada diretamente no módulo raiz e a Lambda recebe apenas as permissões via IAM.
 }
 
 module "iam" {
@@ -47,14 +55,16 @@ module "iam" {
   lambda_role_name    = local.lambda_role_name
   logging_policy_name = local.logging_policy_name
   publish_policy_name = local.publish_policy_name
-  # Passa o ARN da SQS. Se SQS não for criada, passa a string placeholder.
-  sqs_queue_arn       = var.create_sqs_queue && !var.use_existing_sqs_trigger ? module.sqs[0].queue_arn : "SQS_NOT_CREATED_PLACEHOLDER"
-  create_sqs_queue    = var.create_sqs_queue && !var.use_existing_sqs_trigger # Passa a flag ajustada para o IAM
   
-  # NOVO: Passa as variáveis para o módulo IAM para gerenciar permissões de consumo
+  # Passa o ARN da SQS para publicação. Se SQS não for criada OU se estivermos usando uma existente,
+  # passa a string placeholder.
+  sqs_queue_arn       = var.create_sqs_queue && !var.use_existing_sqs_trigger ? module.sqs[0].queue_arn : "SQS_PUBLISH_NOT_APPLICABLE"
+  create_sqs_queue    = var.create_sqs_queue && !var.use_existing_sqs_trigger # Passa a flag ajustada para o IAM para a política de PUBLICAÇÃO
+  
+  # Passa as variáveis para o módulo IAM para gerenciar permissões de consumo
   use_existing_sqs_trigger = var.use_existing_sqs_trigger
   existing_sqs_queue_arn   = var.existing_sqs_queue_arn
-  consume_policy_name      = local.consume_policy_name # Novo nome de política
+  consume_policy_name      = local.consume_policy_name 
 }
 
 module "cloudwatch" {
@@ -71,4 +81,12 @@ resource "aws_lambda_event_source_mapping" "sqs_event_source_mapping" {
   function_name    = module.lambda.lambda_function_name
   batch_size       = 10 # Tamanho do batch, ajuste conforme necessidade
   enabled          = true # Habilitar a trigger
+
+  # NOVO: Validação para garantir que o ARN da fila existente é fornecido quando a trigger é habilitada.
+  lifecycle {
+    precondition {
+      condition     = var.use_existing_sqs_trigger ? (var.existing_sqs_queue_arn != "") : true
+      error_message = "existing_sqs_queue_arn deve ser fornecido e não vazio se use_existing_sqs_trigger for true."
+    }
+  }
 }
