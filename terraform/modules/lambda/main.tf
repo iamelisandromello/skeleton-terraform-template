@@ -15,7 +15,17 @@ resource "aws_lambda_function" "lambda" {
     variables = var.environment_variables
   }
   
-  # A associação do trigger (aws_lambda_event_source_mapping) será feita no módulo raiz (main.tf),
-  # pois o módulo Lambda deve ser genérico e não "saber" sobre todos os seus triggers.
-  # No entanto, a Lambda pode precisar de permissões para o SQS.
+  # NOVO: Preconditions para garantir a lógica de SQS condicional
+  lifecycle {
+    precondition {
+      # Validação de mutualidade exclusiva: create_sqs_queue e use_existing_sqs_trigger não podem ser true ao mesmo tempo.
+      condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
+      error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
+    }
+    precondition {
+      # Validação: existing_sqs_queue_arn deve ser fornecido se use_existing_sqs_trigger for true.
+      condition     = var.use_existing_sqs_trigger ? (var.existing_sqs_queue_arn != "") : true
+      error_message = "existing_sqs_queue_arn deve ser fornecido e não vazio se use_existing_sqs_trigger for true."
+    }
+  }
 }

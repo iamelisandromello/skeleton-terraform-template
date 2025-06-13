@@ -20,14 +20,12 @@ data "aws_s3_bucket" "lambda_code_bucket" {
   bucket = var.s3_bucket_name
 }
 
-# MODIFICADO: Módulo SQS é criado SOMENTE se 'create_sqs_queue' for true E 'use_existing_sqs_trigger' for false
+# Módulo SQS é criado SOMENTE se 'create_sqs_queue' for true E 'use_existing_sqs_trigger' for false
 module "sqs" {
   source     = "./modules/sqs"
-  count      = var.create_sqs_queue && !var.use_existing_sqs_trigger ? 1 : 0 # O módulo será criado se var.create_sqs_queue for true e não estivermos usando uma fila existente
+  count      = var.create_sqs_queue && !var.use_existing_sqs_trigger ? 1 : 0
   queue_name = local.queue_name
-
-  # REMOVIDO: Bloco 'lifecycle' inválido dentro do módulo.
-  # A validação de mutualidade será movida para um recurso válido.
+  # REMOVIDO: Bloco 'lifecycle' foi removido daqui pois não é permitido em blocos 'module'.
 }
 
 module "lambda" {
@@ -40,14 +38,13 @@ module "lambda" {
   s3_key              = local.s3_object_key
   environment_variables = local.merged_env_vars
   
-  # NOVO: Precondition para garantir a mutualidade exclusiva das opções SQS
-  # Este precondition é colocado na Lambda porque ela é o recurso central que depende de ambas as lógicas SQS.
-  lifecycle {
-    precondition {
-      condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
-      error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
-    }
-  }
+  # NOVO: Passando as variáveis de controle SQS para o módulo Lambda
+  create_sqs_queue         = var.create_sqs_queue
+  use_existing_sqs_trigger = var.use_existing_sqs_trigger
+  existing_sqs_queue_arn   = var.existing_sqs_queue_arn # Necessário para a validação dentro da Lambda
+  
+  # REMOVIDO: Bloco 'lifecycle' foi removido daqui pois não é permitido em blocos 'module'.
+  # A precondition de mutualidade exclusiva será movida para o resource aws_lambda_function dentro deste módulo.
 }
 
 module "iam" {
@@ -73,21 +70,16 @@ module "cloudwatch" {
   log_group_name = local.log_group_name
 }
 
-# NOVO: Recurso para configurar a trigger da Lambda para uma fila SQS existente
+# Recurso para configurar a trigger da Lambda para uma fila SQS existente
 # Este recurso será criado SOMENTE se 'use_existing_sqs_trigger' for true.
 resource "aws_lambda_event_source_mapping" "sqs_event_source_mapping" {
-  count = var.use_existing_sqs_trigger ? 1 : 0 # Criar trigger se a flag for true
+  count = var.use_existing_sqs_trigger ? 1 : 0
 
   event_source_arn = var.existing_sqs_queue_arn
   function_name    = module.lambda.lambda_function_name
-  batch_size       = 10 # Tamanho do batch, ajuste conforme necessidade
-  enabled          = true # Habilitar a trigger
+  batch_size       = 10
+  enabled          = true
 
-  # Validação para garantir que o ARN da fila existente é fornecido quando a trigger é habilitada.
-  lifecycle {
-    precondition {
-      condition     = var.use_existing_sqs_trigger ? (var.existing_sqs_queue_arn != "") : true
-      error_message = "existing_sqs_queue_arn deve ser fornecido e não vazio se use_existing_sqs_trigger for true."
-    }
-  }
+  # A validação `existing_sqs_queue_arn` será feita no recurso `aws_lambda_function`
+  # dentro do módulo Lambda, já que ele sempre será avaliado.
 }
