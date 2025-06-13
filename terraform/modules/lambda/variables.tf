@@ -19,6 +19,21 @@ variable "runtime" {
   type = string
 }
 
-# Nenhuma nova variável é necessária aqui, pois a trigger (aws_lambda_event_source_mapping)
-# será gerenciada no módulo Terraform raiz (main.tf), e as permissões de consumo
-# serão gerenciadas no módulo IAM.
+# NOVO: Variáveis passadas do módulo raiz para a Lambda para preconditions
+variable "create_sqs_queue" {
+  description = "Define se uma nova fila SQS será criada (para uso em preconditions)."
+  type        = bool
+  default     = false
+}
+
+variable "use_existing_sqs_trigger" {
+  description = "Define se uma fila SQS existente será usada como trigger (para uso em preconditions)."
+  type        = bool
+  default     = false
+}
+
+variable "existing_sqs_queue_arn" {
+  description = "ARN da fila SQS existente se usada como trigger (para uso em preconditions)."
+  type        = string
+  default     = ""
+}
