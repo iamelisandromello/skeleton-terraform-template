@@ -26,14 +26,8 @@ module "sqs" {
   count      = var.create_sqs_queue && !var.use_existing_sqs_trigger ? 1 : 0 # O módulo será criado se var.create_sqs_queue for true e não estivermos usando uma fila existente
   queue_name = local.queue_name
 
-  # NOVO: Validação para garantir que não tentamos criar SQS e usar uma existente ao mesmo tempo
-  # ou criar SQS sem um nome de fila válido.
-  lifecycle {
-    precondition {
-      condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
-      error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
-    }
-  }
+  # REMOVIDO: Bloco 'lifecycle' inválido dentro do módulo.
+  # A validação de mutualidade será movida para um recurso válido.
 }
 
 module "lambda" {
@@ -45,8 +39,15 @@ module "lambda" {
   s3_bucket           = data.aws_s3_bucket.lambda_code_bucket.bucket
   s3_key              = local.s3_object_key
   environment_variables = local.merged_env_vars
-  # Nenhuma nova variável para a trigger aqui, pois a aws_lambda_event_source_mapping
-  # é criada diretamente no módulo raiz e a Lambda recebe apenas as permissões via IAM.
+  
+  # NOVO: Precondition para garantir a mutualidade exclusiva das opções SQS
+  # Este precondition é colocado na Lambda porque ela é o recurso central que depende de ambas as lógicas SQS.
+  lifecycle {
+    precondition {
+      condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
+      error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
+    }
+  }
 }
 
 module "iam" {
@@ -82,7 +83,7 @@ resource "aws_lambda_event_source_mapping" "sqs_event_source_mapping" {
   batch_size       = 10 # Tamanho do batch, ajuste conforme necessidade
   enabled          = true # Habilitar a trigger
 
-  # NOVO: Validação para garantir que o ARN da fila existente é fornecido quando a trigger é habilitada.
+  # Validação para garantir que o ARN da fila existente é fornecido quando a trigger é habilitada.
   lifecycle {
     precondition {
       condition     = var.use_existing_sqs_trigger ? (var.existing_sqs_queue_arn != "") : true
