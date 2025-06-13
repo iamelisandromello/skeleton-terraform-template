@@ -31,9 +31,9 @@ resource "aws_iam_role_policy" "lambda_logging_policy" {
 
 # MODIFICADO: A política "lambda_sqs_publish" agora é condicional.
 # Ela será criada (count = 1) SOMENTE se var.create_sqs_queue for true.
-# Se var.create_sqs_queue for false, count será 0, e o recurso não será provisionado.
+# Isso se aplica apenas se a SQS estiver sendo criada NESTE deploy.
 resource "aws_iam_role_policy" "lambda_sqs_publish" {
-  count = var.create_sqs_queue ? 1 : 0 # O recurso será criado se 'create_sqs_queue' for true
+  count = var.create_sqs_queue ? 1 : 0 
 
   name = var.publish_policy_name
   role = aws_iam_role.lambda_execution_role.id
@@ -42,10 +42,33 @@ resource "aws_iam_role_policy" "lambda_sqs_publish" {
     Version = "2012-10-17",
     Statement = [{
       Action = ["sqs:SendMessage"],
-      # Quando o count é 1 (i.e., SQS está sendo criada), var.sqs_queue_arn terá um valor válido.
-      # Se o count fosse 0, esta linha não seria avaliada, evitando o erro.
-      Resource = var.sqs_queue_arn, 
+      Resource = var.sqs_queue_arn, # var.sqs_queue_arn virá da nova fila, se criada
       Effect   = "Allow"
     }]
+  })
+}
+
+# NOVO: Política para permitir que a Lambda consuma de uma fila SQS existente
+# Este recurso será criado (count = 1) SOMENTE se var.use_existing_sqs_trigger for true.
+resource "aws_iam_role_policy" "lambda_sqs_consume" {
+  count = var.use_existing_sqs_trigger ? 1 : 0 # Criar política se a flag for true
+
+  name = var.consume_policy_name
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ],
+        # Resource será o ARN da fila SQS existente que foi passado
+        Resource = var.existing_sqs_queue_arn,
+        Effect   = "Allow"
+      }
+    ]
   })
 }

@@ -22,9 +22,29 @@ variable "sqs_queue_arn" {
   type        = string
 }
 
-# NOVO: Variável para controlar a criação condicional da política SQS
+# Variável para controlar a criação condicional da política de PUBLICAÇÃO em SQS
 variable "create_sqs_queue" {
   description = "Define se a fila SQS (e, portanto, sua política de publicação) deve ser criada."
   type        = bool
-  default     = true # O padrão é true para manter o comportamento existente
+  default     = false # Padrão é false, para ser consistente com a nova lógica
+}
+
+# NOVO: Variável para controlar a criação condicional da política de CONSUMO em SQS
+variable "use_existing_sqs_trigger" {
+  description = "Define se a política para consumir de uma fila SQS existente deve ser criada."
+  type        = bool
+  default     = false
+}
+
+# NOVO: ARN da fila SQS existente para permissões de consumo
+variable "existing_sqs_queue_arn" {
+  description = "ARN da fila SQS existente para permissões de consumo."
+  type        = string
+  default     = "" # Padrão vazio
+}
+
+# NOVO: Nome da política IAM para consumo de SQS
+variable "consume_policy_name" {
+  description = "Nome da política IAM para consumo de SQS."
+  type        = string
 }
