@@ -27,7 +27,7 @@ variable "environment" {
     error_message = "environment não pode estar vazio."
   }
 }
- 
+  
 # ================================
 # Variáveis de ambiente da Lambda
 # ================================
@@ -56,9 +56,34 @@ variable "s3_bucket_name" {
   }
 }
 
-# NOVO: Variável para controlar a criação da fila SQS
+# Variável para controlar a criação de uma NOVA fila SQS
 variable "create_sqs_queue" {
-  description = "Define se a fila SQS deve ser criada (true/false)."
+  description = "Define se uma NOVA fila SQS deve ser criada (true/false)."
   type        = bool
-  default     = true # Por padrão, a fila será criada
+  default     = false # Padrão agora é false para dar prioridade à nova funcionalidade
+}
+
+# NOVO: Variável para controlar se usaremos uma fila SQS EXISTENTE como trigger
+variable "use_existing_sqs_trigger" {
+  description = "Define se uma fila SQS existente será usada como trigger para a Lambda."
+  type        = bool
+  default     = false
+}
+
+# NOVO: ARN da fila SQS EXISTENTE se use_existing_sqs_trigger for true
+variable "existing_sqs_queue_arn" {
+  description = "O ARN da fila SQS existente a ser usada como trigger (requer use_existing_sqs_trigger=true)."
+  type        = string
+  default     = "" # Padrão vazio
+
+  validation {
+    condition     = var.use_existing_sqs_trigger ? (var.existing_sqs_queue_arn != "") : true
+    error_message = "existing_sqs_queue_arn deve ser fornecido se use_existing_sqs_trigger for true."
+  }
+}
+
+# NOVO: Validação de mutualidade exclusiva
+validation {
+  condition     = !(var.create_sqs_queue && var.use_existing_sqs_trigger)
+  error_message = "As variáveis 'create_sqs_queue' e 'use_existing_sqs_trigger' não podem ser true ao mesmo tempo. Escolha apenas uma opção para SQS."
 }
