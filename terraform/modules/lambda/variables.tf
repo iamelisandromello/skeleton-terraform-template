@@ -19,7 +19,7 @@ variable "runtime" {
   type = string
 }
 
-# NOVO: Variáveis passadas do módulo raiz para a Lambda para preconditions
+# Variáveis passadas do módulo raiz para a Lambda para preconditions
 variable "create_sqs_queue" {
   description = "Define se uma nova fila SQS será criada (para uso em preconditions)."
   type        = bool
@@ -34,6 +34,13 @@ variable "use_existing_sqs_trigger" {
 
 variable "existing_sqs_queue_arn" {
   description = "ARN da fila SQS existente se usada como trigger (para uso em preconditions)."
+  type        = string
+  default     = ""
+}
+
+# NOVO: Variável para o nome da fila SQS existente (passada do módulo raiz)
+variable "existing_sqs_queue_name" {
+  description = "Nome da fila SQS existente se usada como trigger (para uso em preconditions e logging)."
   type        = string
   default     = ""
 }
