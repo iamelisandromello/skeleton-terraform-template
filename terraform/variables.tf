@@ -70,13 +70,9 @@ variable "use_existing_sqs_trigger" {
   default     = false
 }
 
-# NOVO: ARN da fila SQS EXISTENTE se use_existing_sqs_trigger for true
-variable "existing_sqs_queue_arn" {
-  description = "O ARN da fila SQS existente a ser usada como trigger (requer use_existing_sqs_trigger=true)."
+# MODIFICADO: Agora é o NOME da fila SQS existente
+variable "existing_sqs_queue_name" {
+  description = "O NOME da fila SQS existente a ser usada como trigger (requer use_existing_sqs_trigger=true)."
   type        = string
   default     = "" # Padrão vazio
-  # REMOVIDO: Validação incorreta que referenciava outra variável (use_existing_sqs_trigger)
 }
-
-# REMOVIDO: Bloco 'validation' no nível do módulo (não é sintaxe válida)
-# A validação de mutualidade exclusiva será feita em um 'lifecycle.precondition' no 'main.tf'
